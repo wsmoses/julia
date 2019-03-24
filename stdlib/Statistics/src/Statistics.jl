@@ -332,13 +332,19 @@ function _varm(A::AbstractArray{T}, m, corrected::Bool, dims::Colon, w::Nothing)
     return centralize_sumabs2(A, m) / (n - Int(corrected))
 end
 
-function _varm(A::AbstractArray{T}, m::Real, corrected::Bool, dims::Colon,
+function _varm(A::AbstractArray{T}, m, corrected::Bool, dims::Colon,
                w::AbstractWeights) where T
-    return _moment2(A, w, m; corrected=corrected)
+    s = (zero(T) - zero(m))^2 * zero(eltype(w))
+    @inbounds @simd for i in eachindex(A, w)
+        z = A[i] - m
+        s += (z * z) * w[i]
+    end
+
+    varcorrection(w, corrected) * s
 end
 
 """
-    var(itr; corrected::Bool=true, [weights::AbstractWeights], [dims])
+    var(itr; corrected::Bool=true, [weights::AbstractWeights], [mean], [dims])
 
 Compute the sample variance of collection `itr`.
 
@@ -1042,8 +1048,8 @@ Quantiles are computed via linear interpolation between the points `((k-1)/(n-1)
 for `k = 1:n` where `n = length(itr)`. This corresponds to Definition 7 of Hyndman and Fan
 (1996), and is the same as the R default.
 
-If `itr` is an `AbstractArray`, compute the weighted quantiles using weights vector `w`.
-Weights must not be negative. The weights and data must have the same length.
+If `itr` is an `AbstractArray`, `weights` can be specified to compute weighted quantiles.
+Weights must not be negative and must have the same length as the data.
 With [`FrequencyWeights`](@ref), the function returns the same result as
 `quantile` for a vector with repeated values. Weights must be integers.
 With non `FrequencyWeights`,  denote ``N`` the length of the vector, ``w`` the vector of weights,
