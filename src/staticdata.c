@@ -94,7 +94,7 @@ static jl_value_t *jl_idtable_type = NULL;
 static jl_typename_t *jl_idtable_typename = NULL;
 static jl_value_t *jl_bigint_type = NULL;
 static int gmp_limb_size = 0;
-static arraylist_t builtin_typenames;
+static arraylist_t builtin_typenames; // builtin types with parameters
 
 enum RefTags {
     DataRef,
@@ -1278,11 +1278,15 @@ static void jl_save_system_image_to_stream(ios_t *f)
         jl_serialize_value(&s, jl_module_init_order);
 
         // serialize method tables of builtin types
-        jl_serialize_value(&s, jl_type_typename->mt);
+        jl_serialize_value(&s, jl_type_type_mt->defs);
+        jl_serialize_value(&s, jl_type_type_mt->cache);
+        jl_serialize_value(&s, jl_type_type_mt->kwsorter);
+        jl_serialize_value(&s, jl_type_type_mt->backedges);
+        jl_serialize_value(&s, jl_nonfunction_mt->defs);
+        jl_serialize_value(&s, jl_nonfunction_mt->cache);
+        jl_serialize_value(&s, jl_nonfunction_mt->kwsorter);
+        jl_serialize_value(&s, jl_nonfunction_mt->backedges);
         jl_serialize_value(&s, jl_intrinsic_type->name->mt);
-        jl_serialize_value(&s, jl_sym_type->name->mt);
-        jl_serialize_value(&s, jl_array_typename->mt);
-        jl_serialize_value(&s, jl_module_type->name->mt);
 
         jl_prune_type_cache(jl_tuple_typename->cache);
         jl_prune_type_cache(jl_tuple_typename->linearcache);
@@ -1348,11 +1352,15 @@ static void jl_save_system_image_to_stream(ios_t *f)
         jl_write_value(&s, jl_top_module);
         jl_write_value(&s, jl_typeinf_func);
         write_uint32(f, jl_typeinf_world);
-        jl_write_value(&s, jl_type_typename->mt);
+        jl_write_value(&s, jl_type_type_mt->defs);
+        jl_write_value(&s, jl_type_type_mt->cache);
+        jl_write_value(&s, jl_type_type_mt->kwsorter);
+        jl_write_value(&s, jl_type_type_mt->backedges);
+        jl_write_value(&s, jl_nonfunction_mt->defs);
+        jl_write_value(&s, jl_nonfunction_mt->cache);
+        jl_write_value(&s, jl_nonfunction_mt->kwsorter);
+        jl_write_value(&s, jl_nonfunction_mt->backedges);
         jl_write_value(&s, jl_intrinsic_type->name->mt);
-        jl_write_value(&s, jl_sym_type->name->mt);
-        jl_write_value(&s, jl_array_typename->mt);
-        jl_write_value(&s, jl_module_type->name->mt);
         uintptr_t i;
         for (i = 0; i < builtin_typenames.len; i++) {
             jl_write_value(&s, ((jl_typename_t*)builtin_typenames.items[i])->cache);
@@ -1521,15 +1529,17 @@ static void jl_restore_system_image_from_stream(ios_t *f)
 
     jl_typeinf_func = (jl_function_t*)jl_read_value(&s);
     jl_typeinf_world = read_uint32(f);
-    jl_type_type_mt = (jl_methtable_t*)jl_read_value(&s);
-    jl_type_typename->mt = jl_type_type_mt;
-    jl_unionall_type->name->mt = jl_type_type_mt;
-    jl_uniontype_type->name->mt = jl_type_type_mt;
-    jl_datatype_type->name->mt = jl_type_type_mt;
+
+    // load several method tables from the image
+    jl_type_type_mt->defs = jl_read_value(&s);
+    jl_type_type_mt->cache = jl_read_value(&s);
+    jl_type_type_mt->kwsorter = jl_read_value(&s);
+    jl_type_type_mt->backedges = (jl_array_t*)jl_read_value(&s);
+    jl_nonfunction_mt->defs = jl_read_value(&s);
+    jl_nonfunction_mt->cache = jl_read_value(&s);
+    jl_nonfunction_mt->kwsorter = jl_read_value(&s);
+    jl_nonfunction_mt->backedges = (jl_array_t*)jl_read_value(&s);
     jl_intrinsic_type->name->mt = (jl_methtable_t*)jl_read_value(&s);
-    jl_sym_type->name->mt = (jl_methtable_t*)jl_read_value(&s);
-    jl_array_typename->mt = (jl_methtable_t*)jl_read_value(&s);
-    jl_module_type->name->mt = (jl_methtable_t*)jl_read_value(&s);
 
     uintptr_t i;
     for (i = 0; i < builtin_typenames.len; i++) {
@@ -1666,6 +1676,7 @@ static void jl_init_serializer2(int for_serialize)
                      jl_globalref_type->name, jl_typeofbottom_type->name,
                      jl_string_type->name, jl_abstractstring_type->name,
                      jl_namedtuple_type, jl_namedtuple_typename,
+                     jl_type_type_mt, jl_nonfunction_mt,
 
                      jl_int32_type, jl_int64_type, jl_bool_type, jl_uint8_type,
                      jl_uint32_type, jl_uint64_type,
