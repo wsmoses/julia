@@ -101,6 +101,7 @@ void addTargetPasses(legacy::PassManagerBase *PM, TargetMachine *TM)
 void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
                            bool lower_intrinsics, bool dump_native)
 {
+
 #ifdef JL_DEBUG_BUILD
     PM->add(createGCInvariantVerifierPass(true));
     PM->add(createVerifierPass());
@@ -112,6 +113,7 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
 #if defined(JL_MSAN_ENABLED)
     PM->add(llvm::createMemorySanitizerPass(true));
 #endif
+for(int i=0; i<2; i++) {
     if (opt_level < 2) {
         PM->add(createCFGSimplificationPass()); // Clean up disgusting code
         if (opt_level == 1) {
@@ -121,18 +123,20 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
         }
         PM->add(createMemCpyOptPass()); // Remove memcpy / form memset
         PM->add(createAlwaysInlinerLegacyPass()); // Respect always_inline
-        if (lower_intrinsics) {
+        if (lower_intrinsics && i == 0) {
             PM->add(createBarrierNoopPass());
             PM->add(createLowerExcHandlersPass());
             PM->add(createGCInvariantVerifierPass(false));
             PM->add(createLateLowerGCFramePass());
             PM->add(createLowerPTLSPass(dump_native));
         }
+        if (i == 0)
         PM->add(createLowerSimdLoopPass());        // Annotate loop marked with "loopinfo" as LLVM parallel loop
-        if (dump_native)
+        if (dump_native && i == 0)
             PM->add(createMultiVersioningPass());
         return;
     }
+    if (i == 0)
     PM->add(createPropagateJuliaAddrspaces());
     PM->add(createScopedNoAliasAAWrapperPass());
     PM->add(createTypeBasedAAWrapperPass());
@@ -151,12 +155,13 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
     // Running `memcpyopt` between this and `sroa` seems to give `sroa` a hard time
     // merging the `alloca` for the unboxed data and the `alloca` created by the `alloc_opt`
     // pass.
+    if (i == 0)
     PM->add(createAllocOptPass());
     PM->add(createInstructionCombiningPass()); // Cleanup for scalarrepl.
     // Now that SROA has cleaned up for front-end mess, a lot of control flow should
     // be more evident - try to clean it up.
     PM->add(createCFGSimplificationPass());    // Merge & remove BBs
-    if (dump_native)
+    if (dump_native && i == 0)
         PM->add(createMultiVersioningPass());
     PM->add(createSROAPass());                 // Break up aggregate allocas
     PM->add(createInstructionCombiningPass()); // Cleanup for scalarrepl.
@@ -173,6 +178,7 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
 
     // Load forwarding above can expose allocations that aren't actually used
     // remove those before optimizing loops.
+    if (i == 0)
     PM->add(createAllocOptPass());
     PM->add(createLoopIdiomPass()); //// ****
     PM->add(createLoopRotatePass());           // Rotate loops.
@@ -186,6 +192,7 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
     PM->add(polly::createCodegenCleanupPass());
 #endif
     // LoopRotate strips metadata from terminator, so run LowerSIMD afterwards
+    if (i == 0)
     PM->add(createLowerSimdLoopPass());        // Annotate loop marked with "loopinfo" as LLVM parallel loop
     PM->add(createLICMPass());                 // Hoist loop invariants
     PM->add(createLoopUnswitchPass());         // Unswitch loops.
@@ -197,6 +204,7 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
     //PM->add(createLoopStrengthReducePass());   // (jwb added)
 
     // Run our own SROA on heap objects before LLVM's
+    if (i == 0)
     PM->add(createAllocOptPass());
     // Re-run SROA after loop-unrolling (useful for small loops that operate,
     // over the structure of an aggregate)
@@ -219,6 +227,7 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
     PM->add(createDeadStoreEliminationPass());  // Delete dead stores
 
     // More dead allocation (store) deletion before loop optimization
+    if (i == 0)
     PM->add(createAllocOptPass());
     // see if all of the constant folding has exposed more loops
     // to simplification and deletion
@@ -233,7 +242,7 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
     PM->add(createLoopVectorizePass());         // Vectorize loops
     PM->add(createInstructionCombiningPass());  // Clean up after loop vectorizer
 
-    if (lower_intrinsics) {
+    if (lower_intrinsics && i == 0) {
         // LowerPTLS removes an indirect call. As a result, it is likely to trigger
         // LLVM's devirtualization heuristics, which would result in the entire
         // pass pipeline being re-exectuted. Prevent this by inserting a barrier.
@@ -248,6 +257,10 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
         PM->add(createCFGSimplificationPass());
     }
     PM->add(createCombineMulAddPass());
+if (i==0) {
+    PM->add(createLowerAutodiffIntrinsicPass());
+}
+}
 }
 
 extern "C" JL_DLLEXPORT
@@ -505,6 +518,9 @@ void JuliaOJIT::addModule(std::unique_ptr<Module> M)
     // in our lookup table.
     auto Err = CompileLayer.emitAndFinalize(key);
     // Check for errors to prevent LLVM from crashing the program.
+    if (Err) {
+        llvm::errs() << "error " << Err << "\n";
+    }
     assert(!Err);
 }
 
