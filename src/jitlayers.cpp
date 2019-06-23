@@ -200,6 +200,7 @@ for(int i=0; i<2; i++) {
     PM->add(createInstructionCombiningPass());
     PM->add(createIndVarSimplifyPass());       // Canonicalize indvars
     PM->add(createLoopDeletionPass());         // Delete dead loops
+    if (i == 1)
     PM->add(createSimpleLoopUnrollPass());     // Unroll small loops
     //PM->add(createLoopStrengthReducePass());   // (jwb added)
 

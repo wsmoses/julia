@@ -554,5 +554,6 @@ LLVM_BB_NAME := LLVM.asserts.v$(LLVM_VER)
 endif
 
 $(eval $(call bb-install,llvm,LLVM,true))
+#$(eval $(call bb-install,llvm,LLVM,false,true))
 
 endif # USE_BINARYBUILDER_LLVM
