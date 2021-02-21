@@ -12,6 +12,39 @@ using Test, Random
     end
 end
 
+
+@testset "copysign" begin
+    for elty in (Float32,Float64)
+        @test !signbit(convert(elty, 2.0))
+        @test  signbit(convert(elty,-2.0))
+
+        @test !signbit(convert(elty, NaN))
+        @test  signbit(convert(elty,-NaN))
+
+        @test !signbit(convert(elty, Inf))
+        @test  signbit(convert(elty,-Inf))
+    end
+end
+
+
+@testset "signbit" begin
+    for elty in (Float32,Float64)
+        @test copysign(convert(elty,-2.0),-1.0) = -2.0
+        @test copysign(convert(elty,-2.0),1.0)  =  2.0
+        @test signbit(copysign(convert(elty,NaN),-1.0))
+        @test !signbit(copysign(convert(elty,NaN),1.0))
+        @test signbit(copysign(convert(elty,-NaN),-1.0))
+        @test !signbit(copysign(convert(elty,-NaN),1.0))
+
+        @test copysign(convert(elty,Inf),-1.0) == -Inf
+        @test copysign(convert(elty,Inf), 1.0) == Inf
+
+        @test copysign(convert(elty,-Inf),-1.0) == -Inf
+        @test copysign(convert(elty,-Inf), 1.0) == Inf
+
+    end
+end
+
 @testset "maxintfloat" begin
     @test maxintfloat(Float16) === Float16(2048f0)
     for elty in (Float16,Float32,Float64)

@@ -7,14 +7,12 @@ copysign(x::Float32, y::Float32) = copysign_float(x, y)
 copysign(x::Float32, y::Real) = copysign(x, Float32(y))
 copysign(x::Float64, y::Real) = copysign(x, Float64(y))
 
-flipsign(x::Float64, y::Float64) = bitcast(Float64, xor_int(bitcast(UInt64, x), and_int(bitcast(UInt64, y), 0x8000000000000000)))
-flipsign(x::Float32, y::Float32) = bitcast(Float32, xor_int(bitcast(UInt32, x), and_int(bitcast(UInt32, y), 0x80000000)))
-flipsign(x::Float32, y::Real) = flipsign(x, Float32(y))
-flipsign(x::Float64, y::Real) = flipsign(x, Float64(y))
+flipsign(x::Real, y::Real) = copysign(x, (signbit(y) == signbit(x)) ? 1.0 : -1.0)
+flipsign(x::Float64, y::Real) = copysign(x, (signbit(y) == signbit(x)) ? 1.0 : -1.0)
 
-signbit(x::Float64) = signbit(bitcast(Int64, x))
-signbit(x::Float32) = signbit(bitcast(Int32, x))
-signbit(x::Float16) = signbit(bitcast(Int16, x))
+signbit(x::Float64) = copysign(1.0, x) < 0
+signbit(x::Float32) = copysign(1.0, x) < 0
+signbit(x::Float16) = copysign(1.0, x) < 0
 
 """
     maxintfloat(T=Float64)
