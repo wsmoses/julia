@@ -1,0 +1,14 @@
+diff --git a/llvm/lib/Transforms/CMakeLists.txt b/llvm/lib/Transforms/CMakeLists.txt
+index dda5f6de11e3..c340af4bc4c5 100644
+--- a/llvm/lib/Transforms/CMakeLists.txt
++++ b/llvm/lib/Transforms/CMakeLists.txt
+@@ -5,7 +5,8 @@ add_subdirectory(InstCombine)
+ add_subdirectory(Scalar)
+ add_subdirectory(IPO)
+ add_subdirectory(Vectorize)
+-add_subdirectory(Hello)
++# Broken if disabling tools
++# add_subdirectory(Hello)
+ add_subdirectory(ObjCARC)
+ add_subdirectory(Coroutines)
+ add_subdirectory(CFGuard)
