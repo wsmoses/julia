@@ -235,6 +235,7 @@ endef
 
 $(eval $(call LLVM_PATCH,llvm-ittapi-cmake))
 $(eval $(call LLVM_PATCH,llvm-hello-cmake))
+$(eval $(call LLVM_PATCH,llvm-vis-cmake))
 
 ifeq ($(USE_SYSTEM_ZLIB), 0)
 $(LLVM_BUILDDIR_withtype)/build-configured: | $(build_prefix)/manifest/zlib
