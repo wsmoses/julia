@@ -33,8 +33,8 @@ JL_DLLEXPORT int8_t jl_threadpoolid(int16_t tid) JL_NOTSAFEPOINT;
 // JL_HAVE_UCONTEXT -- posix standard API, requires syscall for resume
 // JL_HAVE_SIGALTSTACK -- requires several syscall for start, setjmp for resume
 
-#ifdef _OS_WINDOWS_
 #define JL_HAVE_UCONTEXT
+#ifdef _OS_WINDOWS_
 typedef win32_ucontext_t jl_stack_context_t;
 typedef jl_stack_context_t _jl_ucontext_t;
 #else
