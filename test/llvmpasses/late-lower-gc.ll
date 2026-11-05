@@ -230,8 +230,8 @@ define void @decayar([2 x {} addrspace(10)* addrspace(11)*] %ar) {
 define void @sink_non_entry_alloca(i1 %cond) {
 top:
 ; CHECK-LABEL: @sink_non_entry_alloca
-; TYPED: %gcframe = call {} addrspace(10)** @julia.new_gc_frame(i32 1)
-; OPAQUE: %gcframe = call ptr @julia.new_gc_frame(i32 1)
+; TYPED: %gcframe = call {} addrspace(10)** @julia.new_gc_frame(i32 2)
+; OPAQUE: %gcframe = call ptr @julia.new_gc_frame(i32 2)
 ; CHECK-NOT: @julia.get_gc_frame_slot
   %pgcstack = call {}*** @julia.get_pgcstack()
   %local = alloca {} addrspace(10)*, align 8
@@ -247,6 +247,84 @@ use_bb:
   call void @jl_safepoint()
   %loaded = load {} addrspace(10)*, {} addrspace(10)** %local, align 8
   call void @boxed_simple({} addrspace(10)* %loaded, {} addrspace(10)* %loaded)
+  br label %exit
+
+exit:
+; CHECK: exit:
+; TYPED-NEXT: call void @julia.pop_gc_frame({} addrspace(10)** %gcframe)
+; OPAQUE-NEXT: call void @julia.pop_gc_frame(ptr %gcframe)
+  ret void
+}
+
+define void @sink_alloca_common_dominator(i1 %c1, i1 %c2, {} addrspace(10)* %val) {
+top:
+; CHECK-LABEL: @sink_alloca_common_dominator
+; TYPED: %gcframe = call {} addrspace(10)** @julia.new_gc_frame(i32 2)
+; OPAQUE: %gcframe = call ptr @julia.new_gc_frame(i32 2)
+; CHECK-NOT: @julia.get_gc_frame_slot
+  %pgcstack = call {}*** @julia.get_pgcstack()
+  %local = alloca {} addrspace(10)*, align 8
+; CHECK: br i1 %c1, label %dom, label %exit
+  br i1 %c1, label %dom, label %exit
+
+dom:
+; CHECK: dom:
+; TYPED-NEXT: %local = call {} addrspace(10)** @julia.get_gc_frame_slot({} addrspace(10)** %gcframe, i32 0)
+; OPAQUE-NEXT: %local = call ptr @julia.get_gc_frame_slot(ptr %gcframe, i32 0)
+; CHECK-NEXT: br i1 %c2, label %left, label %right
+  br i1 %c2, label %left, label %right
+
+left:
+; CHECK: left:
+; TYPED-NEXT: store {} addrspace(10)* %val, {} addrspace(10)** %local, align 8
+; OPAQUE-NEXT: store ptr addrspace(10) %val, ptr %local, align 8
+  store {} addrspace(10)* %val, {} addrspace(10)** %local, align 8
+  call void @jl_safepoint()
+  %lval = load {} addrspace(10)*, {} addrspace(10)** %local, align 8
+  call void @boxed_simple({} addrspace(10)* %lval, {} addrspace(10)* %lval)
+  br label %exit
+
+right:
+; CHECK: right:
+; TYPED-NEXT: store {} addrspace(10)* %val, {} addrspace(10)** %local, align 8
+; OPAQUE-NEXT: store ptr addrspace(10) %val, ptr %local, align 8
+  store {} addrspace(10)* %val, {} addrspace(10)** %local, align 8
+  call void @jl_safepoint()
+  %rval = load {} addrspace(10)*, {} addrspace(10)** %local, align 8
+  call void @boxed_simple({} addrspace(10)* %rval, {} addrspace(10)* %rval)
+  br label %exit
+
+exit:
+; CHECK: exit:
+; TYPED-NEXT: call void @julia.pop_gc_frame({} addrspace(10)** %gcframe)
+; OPAQUE-NEXT: call void @julia.pop_gc_frame(ptr %gcframe)
+  ret void
+}
+
+define void @tracked_store_slot_placement(i1 %cond, {} addrspace(10)* %val) {
+top:
+; CHECK-LABEL: @tracked_store_slot_placement
+; TYPED: %gcframe = call {} addrspace(10)** @julia.new_gc_frame(i32 1)
+; OPAQUE: %gcframe = call ptr @julia.new_gc_frame(i32 1)
+; CHECK-NOT: @julia.get_gc_frame_slot
+  %pgcstack = call {}*** @julia.get_pgcstack()
+  %buf = alloca [2 x i64], align 8
+; CHECK: br i1 %cond, label %store_bb, label %exit
+  br i1 %cond, label %store_bb, label %exit
+
+store_bb:
+; CHECK: store_bb:
+; TYPED-NEXT: %ptr_cast = bitcast [2 x i64]* %buf to {} addrspace(10)**
+; TYPED-NEXT: [[TS_SLOT:%.*]] = call {} addrspace(10)** @julia.get_gc_frame_slot({} addrspace(10)** %gcframe, i32 0)
+; TYPED-NEXT: store {} addrspace(10)* %val, {} addrspace(10)** [[TS_SLOT]]
+; TYPED-NEXT: store {} addrspace(10)* %val, {} addrspace(10)** %ptr_cast, align 8
+; OPAQUE-NEXT: %ptr_cast = bitcast ptr %buf to ptr
+; OPAQUE-NEXT: [[TS_SLOT:%.*]] = call ptr @julia.get_gc_frame_slot(ptr %gcframe, i32 0)
+; OPAQUE-NEXT: store ptr addrspace(10) %val, ptr [[TS_SLOT]]
+; OPAQUE-NEXT: store ptr addrspace(10) %val, ptr %ptr_cast, align 8
+  %ptr_cast = bitcast [2 x i64]* %buf to {} addrspace(10)**
+  store {} addrspace(10)* %val, {} addrspace(10)** %ptr_cast, align 8
+  call void @jl_safepoint()
   br label %exit
 
 exit:
